@@ -1,213 +1,88 @@
-import { walk } from "@std/fs";
-import { basename } from "@std/path";
-
-interface ProductBlock {
-  name: string;
-  content: string;
-  blocks: {
-    nutrition?: NutritionBlock;
-    price?: PriceBlock;
-    ingredients?: IngredientsBlock;
-    recipe?: RecipeBlock;
-  };
-}
-
-interface NutritionBlock {
-  values: NutritionBlockValues;
-  portionSize: number;
-  totalWeight: number;
-}
-
-interface NutritionBlockValues {
-  proteins: number;
-  fats: number;
-  carbohydrates: number;
-  calories: number;
-}
-
-interface PriceBlock {
-  prices: { date: string; price: number }[];
-}
-
-interface IngredientsBlock {
-  items: { name: string; amount: string }[];
-}
-
-interface RecipeBlock {
-  steps: string[];
-}
-
-/**
- * Парсит содержимое файла и извлекает структурированные блоки
- */
-function parseFileContent(content: string): Omit<ProductBlock, 'name'> {
-  const blocks: ProductBlock["blocks"] = {};
-  let currentBlock: string | null = null;
-  let blockContent: string[] = [];
-
-  // Разбиваем файл на строки
-  const lines = content.split("\n");
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    // Проверяем заголовок блока
-    const blockMatch = line.match(/\*\*(.*?)\*\*/);
-
-    if (blockMatch) {
-      // Если нашли новый заголовок, обрабатываем предыдущий блок
-      if (currentBlock) {
-        processBlock(currentBlock, blockContent, blocks);
-      }
-
-      // Начинаем новый блок
-      currentBlock = blockMatch[1].toLowerCase();
-      blockContent = [];
-    } else if (line && currentBlock) {
-      // Добавляем строку к текущему блоку
-      blockContent.push(line);
-    }
-  }
-
-  // Обрабатываем последний блок
-  if (currentBlock) {
-    processBlock(currentBlock, blockContent, blocks);
-  }
-
-  return {
-    content,
-    blocks
-  };
-}
-
-function getNutritionValues(nutritionStr: string): NutritionBlockValues {
-  const [fats, proteins, carbohydrates, calories] = nutritionStr.split('/')
-
-  return {
-    fats: Number(fats),
-    proteins: Number(proteins),
-    carbohydrates: Number(carbohydrates),
-    calories: Number(calories)
-  }
-}
-
-/**
- * Обрабатывает содержимое блока и добавляет структурированные данные
- */
-function processBlock(
-  blockName: string,
-  content: string[],
-  blocks: ProductBlock["blocks"]
-) {
-  switch (blockName) {
-    case "пищевая ценность":
-      if (content.length >= 3) {
-        blocks.nutrition = {
-          values: getNutritionValues(content[0]),
-          portionSize: Number(content[1]),
-          totalWeight: Number(content[2])
-        };
-      }
-      break;
-
-    case "цена": {
-      const prices = content
-        .filter(line => line.startsWith('-'))
-        .map(line => {
-          const match = line.match(/- \[\[(.*?)]] (\d+)/);
-          if (match) {
-            return { date: match[1], price: parseInt(match[2]) };
-          }
-          return null;
-        })
-        .filter((item): item is { date: string; price: number } => item !== null);
-
-      blocks.price = { prices };
-      break;
-    }
-
-    case "состав": {
-      const ingredients = content
-        .filter(line => line.startsWith('-'))
-        .map(line => {
-          const match = line.match(/- (.*?) - (.*)/);
-          if (match) {
-            return { name: match[1], amount: match[2] };
-          }
-          return null;
-        })
-        .filter((item): item is { name: string; amount: string } => item !== null);
-
-      blocks.ingredients = { items: ingredients };
-      break;
-    }
-
-    case "рецепт":
-      blocks.recipe = {
-        steps: content.map(line => line.replace(/^\d+\)\s*/, '').trim())
-      };
-      break;
-  }
-}
-
-/**
- * Рекурсивно обходит директорию и собирает все файлы
- */
-async function processDirectory(dir: string): Promise<ProductBlock[]> {
-  const products: ProductBlock[] = [];
-
-  for await (const entry of walk(dir, { exts: [".md"] })) {
-    if (entry.isFile) {
-      const content = await Deno.readTextFile(entry.path);
-      try {
-        const product = parseFileContent(content);
-        const fileName = basename(entry.path).split('.')[0]
-        if (fileName === '_readme') {
-          continue
-        }
-        products.push({ ...product, name: fileName });
-      } catch (e) {
-        console.error(`Ошибка при обработке файла ${entry.path}:`, e);
-      }
-    }
-  }
-
-  return products;
-}
-
-/**
- * Объединяет все продукты в один файл
- */
-function concatenateProducts(products: ProductBlock[]): string {
-  return products.map(product =>
-    `---\n${product.name}\n${product.content}\n`
-  ).join("---\n") + "---";
-}
-
 // Основная функция
+import {NutritionBlockValues, processDirectory, ProductBlock} from "./parse-nutritions.ts";
+import {FoodUnit, parseDayMeal} from "./parse-day-meal.ts";
+
+function countNutritionValueForQuantity(productValue: NutritionBlockValues[keyof NutritionBlockValues], quantity: number, portionSize = 1) {
+  return Math.round(productValue / 100 * Number(quantity) * portionSize);
+}
+
+type SummaryProductNutrition = {
+  name: string;
+} & NutritionBlockValues
+
+
+function countDayNutrition(products: ProductBlock[], dayMeal: FoodUnit[]) {
+  const sumProducts: SummaryProductNutrition[] = [];
+
+  dayMeal.forEach(({ name: productName, quantity, unit }) => {
+    const productData = products.find((product) => productName === product.name);
+    if (productData?.blocks.nutrition) {
+      const { portionSize, values } = productData.blocks.nutrition;
+      const {fats, proteins, carbohydrates, calories} = values
+      
+      const portion = unit ? 1 : portionSize || 1;
+      
+      sumProducts.push({
+        name: productName,
+        fats: countNutritionValueForQuantity(fats, quantity, portion),
+        proteins: countNutritionValueForQuantity(proteins, quantity, portion),
+        carbohydrates: countNutritionValueForQuantity(carbohydrates, quantity, portion),
+        calories: countNutritionValueForQuantity(calories, quantity, portion),
+      })
+    }
+  })
+
+  const uniqueProducts = sumProducts.reduce<Record<string, Omit<SummaryProductNutrition, 'name'>>>((acc, { name, fats, proteins, carbohydrates, calories}) => {
+    acc[name] = {
+      fats: (acc[name]?.fats || 0) + fats,
+      proteins: (acc[name]?.proteins || 0) + proteins,
+      carbohydrates: (acc[name]?.carbohydrates || 0) + carbohydrates,
+      calories: (acc[name]?.calories || 0) + calories
+    }
+
+    return acc
+  }, {});
+
+  const result = Object.values(uniqueProducts).reduce((acc, { fats, proteins, carbohydrates, calories }) => {
+    return {
+      fats: acc.fats + fats,
+      proteins: acc.proteins + proteins,
+      carbohydrates: acc.carbohydrates + carbohydrates,
+      calories: acc.calories + calories
+    }
+  }, { fats: 0, proteins: 0, carbohydrates: 0, calories: 0 });
+
+  // eslint-disable-next-line no-console
+  console.log(result)
+
+  return result
+}
+
 async function main() {
   if (Deno.args.length < 1) {
-    console.error("Использование: deno run --allow-read --allow-write file_parser.ts <директория> <выходной файл>");
+    console.error("Использование: deno run --allow-read --allow-write file_parser.ts <директория продуктов> <файл для рассчета>");
     Deno.exit(1);
   }
 
-  const sourceDir = Deno.args[0];
-  const outputFile = Deno.args[1] || "all_products.txt";
+  const productsDir = Deno.args[0];
+  const dayMealFileName = Deno.args[1]
+  // const outputFile = Deno.args[1] || "all_products.txt";
 
-  console.log(`Обрабатываем директорию: ${sourceDir}`);
-  console.log(`Результат будет сохранен в: ${outputFile}`);
+  console.log(`Обрабатываем директорию: ${productsDir}`);
+  // console.log(`Результат будет сохранен в: ${outputFile}`);
 
   try {
-    const products = await processDirectory(sourceDir);
+    const products = await processDirectory(productsDir);
+    const dayMeal = await parseDayMeal(dayMealFileName);
+    if (dayMeal) {
+      countDayNutrition(products, dayMeal)
+    }
     console.log(`Найдено файлов: ${products.length}`);
-
-    const outputContent = concatenateProducts(products);
-    await Deno.writeTextFile(outputFile, outputContent);
-
+    // eslint-disable-next-line no-console
     console.log("Обработка завершена успешно!");
   } catch (e) {
     console.error("Произошла ошибка:", e);
   }
 }
 
-main();
+await main();
