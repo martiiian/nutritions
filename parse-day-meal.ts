@@ -24,12 +24,12 @@ class FoodLogParser {
     if (!line.trim().startsWith('- [[')) return;
 
     // Парсим название и количество
-    const foodRegex = /- \[\[(.+?)]] - (.+)$/;
+    const foodRegex = /- \[\[(.+?)]]( - (.+))?$/
     const match = line.match(foodRegex);
 
     if (match) {
       const foodName = match[1];
-      const quantityStr = match[2].trim();
+      const quantityStr = match[3]?.trim() || '1';
 
       // Разделяем количество и единицу измерения
       const unitRegex = /^(\d+(?:\.\d+)?)(\D+)?$/;

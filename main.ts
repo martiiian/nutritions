@@ -1,3 +1,5 @@
+import { blue, green } from "@std/fmt/colors"
+
 // Основная функция
 import {NutritionBlockValues, processDirectory, ProductBlock} from "./parse-nutritions.ts";
 import {FoodUnit, parseDayMeal} from "./parse-day-meal.ts";
@@ -43,7 +45,7 @@ function countDayNutrition(products: ProductBlock[], dayMeal: FoodUnit[]) {
     return acc
   }, {});
 
-  const result = Object.values(uniqueProducts).reduce((acc, { fats, proteins, carbohydrates, calories }) => {
+  const dayResult = Object.values(uniqueProducts).reduce((acc, { fats, proteins, carbohydrates, calories }) => {
     return {
       fats: acc.fats + fats,
       proteins: acc.proteins + proteins,
@@ -52,10 +54,19 @@ function countDayNutrition(products: ProductBlock[], dayMeal: FoodUnit[]) {
     }
   }, { fats: 0, proteins: 0, carbohydrates: 0, calories: 0 });
 
-  // eslint-disable-next-line no-console
-  console.log(result)
+  return { dayResult, uniqueProducts }
+}
 
-  return result
+function renderMessage(dayResult:  Omit<SummaryProductNutrition, "name">, uniqueProducts: Record<string, Omit<SummaryProductNutrition, "name">>) {
+  console.log()
+
+  Object.entries(uniqueProducts).forEach(([name, { fats, calories, proteins, carbohydrates }]) => {
+    console.log(`${fats}/${proteins}/${carbohydrates}/${calories}   `, green(name));
+  })
+  
+  console.log()
+
+  console.log(blue(`Day result: ${`${dayResult.fats}/${dayResult.proteins}/${dayResult.carbohydrates}/${dayResult.calories}`}`))
 }
 
 async function main() {
@@ -73,13 +84,13 @@ async function main() {
 
   try {
     const products = await processDirectory(productsDir);
+    console.log(`Найдено файлов: ${products.length}`);
+    console.log("Обработка завершена успешно!");
     const dayMeal = await parseDayMeal(dayMealFileName);
     if (dayMeal) {
-      countDayNutrition(products, dayMeal)
+      const { dayResult, uniqueProducts } = countDayNutrition(products, dayMeal)
+      renderMessage(dayResult, uniqueProducts);
     }
-    console.log(`Найдено файлов: ${products.length}`);
-    // eslint-disable-next-line no-console
-    console.log("Обработка завершена успешно!");
   } catch (e) {
     console.error("Произошла ошибка:", e);
   }
