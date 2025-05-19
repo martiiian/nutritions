@@ -125,7 +125,6 @@ async function main() {
   try {
     const products = await parseProducts(productsDir)
     // eslint-disable-next-line no-console
-    console.log(products)
     console.log(`Найдено файлов: ${products.length}`)
     console.log('Обработка завершена успешно!')
     const dayMeal = await parseDayMeal(dayMealFileName)
