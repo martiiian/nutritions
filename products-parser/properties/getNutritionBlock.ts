@@ -1,9 +1,4 @@
-export interface NutritionBlockValues {
-  proteins: number
-  fats: number
-  carbohydrates: number
-  calories: number
-}
+import { NutritionBlockValues, ProductType } from '../../types.ts'
 
 function getNutritionValues(nutritionStr: string): NutritionBlockValues {
   const [fats, proteins, carbohydrates, calories] = nutritionStr.split('/')
@@ -16,7 +11,7 @@ function getNutritionValues(nutritionStr: string): NutritionBlockValues {
   }
 }
 
-export function getNutritionBlock(content: string[]) {
+export function getNutritionBlock(content: string[]): ProductType['nutrition'] {
   return {
     values: getNutritionValues(content[0]),
     portionSize: Number(content[1]) || null,

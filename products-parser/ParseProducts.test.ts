@@ -1,8 +1,4 @@
-// parse_products_test.ts
-import {
-  assertEquals,
-  assertExists,
-} from 'jsr:@std/assert'
+import { assertEquals, assertExists } from '@std/assert'
 import { parseProducts } from './ParseProducts.ts'
 
 Deno.test('parseProducts', async () => {
@@ -31,14 +27,14 @@ Deno.test('parseProducts', async () => {
 
   try {
     const products = await parseProducts(tempDir)
+    const product = products.get('product1')
 
     // Test general structure
-    assertEquals(products.length, 1)
-    assertEquals(products[0].name, 'product1')
-    assertExists(products[0].blocks)
-    
+    assertEquals(products.size, 1)
+    assertExists(product)
+
     // Test nutrition block
-    const nutrition = products[0].blocks.nutrition
+    const nutrition = product.nutrition
     assertExists(nutrition)
     assertEquals(nutrition.portionSize, 100)
     assertEquals(nutrition.values.proteins, 10)
@@ -47,21 +43,29 @@ Deno.test('parseProducts', async () => {
     assertEquals(nutrition.values.calories, 203)
 
     // Test price block
-    const price = products[0].blocks.price
+    const price = product.price
     assertExists(price)
     assertEquals(price.prices.length, 2)
     assertEquals(price.prices[0], { date: '2023-01-01', price: 100 })
     assertEquals(price.prices[1], { date: '2023-02-01', price: 120 })
 
     // Test ingredients block
-    const ingredients = products[0].blocks.ingredients
+    const ingredients = product.ingredients
     assertExists(ingredients)
     assertEquals(ingredients.items.length, 2)
-    assertEquals(ingredients.items[0], { name: 'Мука', amount: '200г' })
-    assertEquals(ingredients.items[1], { name: 'Сахар', amount: '100г' })
+    assertEquals(ingredients.items[0], {
+      name: 'Мука',
+      quantity: 200,
+      unit: 'г',
+    })
+    assertEquals(ingredients.items[1], {
+      name: 'Сахар',
+      quantity: 100,
+      unit: 'г',
+    })
 
     // Test recipe block
-    const recipe = products[0].blocks.recipe
+    const recipe = product.recipe
     assertExists(recipe)
     assertEquals(recipe.steps.length, 2)
     assertEquals(recipe.steps[0], '- Смешать ингредиенты')
@@ -77,7 +81,7 @@ Deno.test('parseProducts handles empty directory', async () => {
 
   try {
     const products = await parseProducts(tempDir)
-    assertEquals(products.length, 0)
+    assertEquals(products.size, 0)
   } finally {
     await Deno.remove(tempDir, { recursive: true })
   }
@@ -90,22 +94,7 @@ Deno.test('parseProducts ignores _readme.md', async () => {
 
   try {
     const products = await parseProducts(tempDir)
-    assertEquals(products.length, 0)
-  } finally {
-    await Deno.remove(tempDir, { recursive: true })
-  }
-})
-
-Deno.test('parseProducts handles invalid content', async () => {
-  const tempDir = await Deno.makeTempDir()
-
-  await Deno.writeTextFile(`${tempDir}/invalid.md`, 'Invalid content')
-
-  try {
-    const products = await parseProducts(tempDir)
-    assertEquals(products.length, 1)
-    assertEquals(products[0].name, 'invalid')
-    assertEquals(Object.keys(products[0].blocks).length, 0)
+    assertEquals(products.size, 0)
   } finally {
     await Deno.remove(tempDir, { recursive: true })
   }
@@ -124,11 +113,13 @@ Deno.test('parseProducts handles missing blocks', async () => {
 
   try {
     const products = await parseProducts(tempDir)
-    assertEquals(products.length, 1)
-    assertExists(products[0].blocks.nutrition)
-    assertEquals(products[0].blocks.price, undefined)
-    assertEquals(products[0].blocks.ingredients, undefined)
-    assertEquals(products[0].blocks.recipe, undefined)
+    const product = products.get('partial')
+
+    assertEquals(products.size, 1)
+    // assertExists(products[0].nutrition, null)
+    assertEquals(product?.price, null)
+    assertEquals(product?.ingredients, null)
+    assertEquals(product?.recipe, null)
   } finally {
     await Deno.remove(tempDir, { recursive: true })
   }

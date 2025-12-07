@@ -1,56 +1,30 @@
 import { walk } from '@std/fs'
 import { basename } from '@std/path'
-import {
-  getNutritionBlock,
-  NutritionBlockValues,
-} from './content-blocks/getNutritionBlock.ts'
-import { getPriceBlock } from './content-blocks/getPriceBlock.ts'
-import { getCompositionBlock } from './content-blocks/getCompositionBlock.ts'
-import { getRecipeBlock } from './content-blocks/getRecipeBlock.ts'
+import { calculateFoodItemsNutrition } from '../day-nutrition-calculator/index.ts'
+import { ProductPropertyTypes, ProductsType, ProductType } from '../types.ts'
+import { getNutritionBlock } from './properties/getNutritionBlock.ts'
+import { getPriceBlock } from './properties/getPriceBlock.ts'
+import { getCompositionBlock } from './properties/getCompositionBlock.ts'
+import { getRecipeBlock } from './properties/getRecipeBlock.ts'
 
-enum Blocks {
-  Nutrition = 'пищевая ценность',
-  Price = 'цена',
-  Composition = 'состав',
-  Recipe = 'рецепт',
-}
+const IGNORED_FILE_NAMES = ['_readme']
+const FILE_EXTENSIONS = ['.md']
 
-export interface ProductBlock {
-  name: string
-  content: string
-  blocks: {
-    nutrition?: NutritionBlock
-    price?: PriceBlock
-    ingredients?: IngredientsBlock
-    recipe?: RecipeBlock
-  }
-}
-
-interface NutritionBlock {
-  values: NutritionBlockValues
-  portionSize: number | null
-  totalWeight: number | null
-}
-
-interface PriceBlock {
-  prices: { date: string; price: number }[]
-}
-
-interface IngredientsBlock {
-  items: { name: string; amount: string }[]
-}
-
-interface RecipeBlock {
-  steps: string[]
-}
+type OutputProduct = Omit<ProductType, 'name' | 'content'>
 
 /**
  * Парсит содержимое файла и извлекает структурированные блоки
  */
-function parseFileContent(content: string): Omit<ProductBlock, 'name'> {
-  const blocks: ProductBlock['blocks'] = {}
-  let currentBlock: string | null = null
-  let blockContent: string[] = []
+function parseProduct(content: string): OutputProduct {
+  const product = {
+    nutrition: null,
+    price: null,
+    recipe: null,
+    ingredients: null,
+  }
+
+  let propertyName: string | null = null
+  let propertyContent: string[] = []
 
   // Разбиваем файл на строки
   const lines = content.split('\n')
@@ -59,85 +33,115 @@ function parseFileContent(content: string): Omit<ProductBlock, 'name'> {
     const line = lines[i].trim()
 
     // Проверяем заголовок блока
-    const blockMatch = line.match(/\*\*(.*?)\*\*/)
+    const foundProperty = line.match(/\*\*(.*?)\*\*/)
 
-    if (blockMatch) {
-      // Если нашли новый заголовок, обрабатываем предыдущий блок
-      if (currentBlock) {
-        processBlock(currentBlock, blockContent, blocks)
-      }
+    if (foundProperty) {
+      // Если нашли новый заголовок, обрабатываем предыдущий собранный блок
+      parseProperty({ product, propertyContent, propertyName })
 
       // Начинаем новый блок
-      currentBlock = blockMatch[1].toLowerCase()
-      blockContent = []
-    } else if (line && currentBlock) {
+      propertyName = foundProperty[1].toLowerCase()
+      propertyContent = []
+    } else if (line && propertyName) {
       // Добавляем строку к текущему блоку
-      blockContent.push(line)
+      propertyContent.push(line)
     }
   }
 
-  // Обрабатываем последний блок
-  if (currentBlock) {
-    processBlock(currentBlock, blockContent, blocks)
+  if (propertyName) {
+    parseProperty({ product, propertyContent, propertyName })
   }
 
-  return {
-    content,
-    blocks,
+  return product
+}
+
+function parseProperty(
+  { product, propertyName, propertyContent }: {
+    product: OutputProduct
+    propertyName: string | null
+    propertyContent: string[]
+  },
+) {
+  if (propertyName === ProductPropertyTypes.Nutrition) {
+    product.nutrition = getNutritionBlock(propertyContent)
+  }
+  if (propertyName === ProductPropertyTypes.Price) {
+    product.price = getPriceBlock(propertyContent)
+  }
+  if (propertyName === ProductPropertyTypes.Composition) {
+    product.ingredients = getCompositionBlock(propertyContent)
+  }
+  if (propertyName === ProductPropertyTypes.Recipe) {
+    product.recipe = getRecipeBlock(propertyContent)
   }
 }
 
-/**
- * Обрабатывает содержимое блока и добавляет структурированные данные
- */
-function processBlock(
-  blockName: string,
-  content: string[],
-  blocks: ProductBlock['blocks'],
+function calculateNutritionsForProductsWithIngredients(
+  products: ProductsType,
+  productsWithIngredients: Set<string>,
 ) {
-  switch (blockName) {
-    case Blocks.Nutrition: {
-      blocks.nutrition = getNutritionBlock(content)
-      break
+  productsWithIngredients.forEach((productName) => {
+    const productWithIngredients = products.get(productName)
+    if (!productWithIngredients?.ingredients?.items) {
+      return
     }
 
-    case Blocks.Price: {
-      blocks.price = getPriceBlock(content)
-      break
+    const { dayResult } = calculateFoodItemsNutrition(
+      products,
+      productWithIngredients?.ingredients?.items,
+    )
+
+    productWithIngredients.nutrition = {
+      values: dayResult,
+      portionSize: productWithIngredients.nutrition?.portionSize || null,
+      totalWeight: productWithIngredients.nutrition?.totalWeight || null,
     }
 
-    case Blocks.Composition: {
-      blocks.ingredients = getCompositionBlock(content)
-      break
-    }
-
-    case Blocks.Recipe: {
-      blocks.recipe = getRecipeBlock(content)
-      break
-    }
-  }
+    // productWithIngredients.ingredients.items.reduce(({ amount, name }) => {
+    //   const ingredient = products.get(name)
+    //   if (!ingredient?.nutrition && ingredient?.ingredients?.items) {
+    //     // todo go to recurse
+    //   }
+    //
+    //   if (ingredient?.nutrition && !ingredient?.ingredients) {
+    //   }
+    // })
+  })
 }
 
 /**
  * Рекурсивно обходит директорию и собирает все файлы
  */
-export async function parseProducts(dir: string): Promise<ProductBlock[]> {
-  const products: ProductBlock[] = []
+export async function parseProducts(dir: string): Promise<ProductsType> {
+  const products = new Map()
+  const productsWithIngredients = new Set<string>()
 
-  for await (const entry of walk(dir, { exts: ['.md'] })) {
+  for await (const entry of walk(dir, { exts: FILE_EXTENSIONS })) {
     if (entry.isFile) {
       const content = await Deno.readTextFile(entry.path)
       try {
-        const product = parseFileContent(content)
+        const product = parseProduct(content)
         const fileName = basename(entry.path).split('.')[0]
-        if (fileName === '_readme') {
+        if (IGNORED_FILE_NAMES.includes(fileName)) {
           continue
         }
-        products.push({ ...product, name: fileName })
+
+        if (product.ingredients) {
+          productsWithIngredients.add(fileName)
+        }
+
+        products.set(fileName, product)
       } catch (e) {
         console.error(`Ошибка при обработке файла ${entry.path}:`, e)
       }
     }
+  }
+
+  if (productsWithIngredients.size) {
+    calculateNutritionsForProductsWithIngredients(
+      products,
+      productsWithIngredients,
+    )
   }
 
   return products

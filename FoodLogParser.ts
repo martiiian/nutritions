@@ -1,8 +1,4 @@
-export type FoodUnit = {
-  name: string
-  quantity: number
-  unit: string | null
-}
+import { FoodUnit } from './types.ts'
 
 const FOOD_ROW_REGEX = /- \[\[(.+?)]]( - (.+))?$/
 const UNIT_REGEX = /^(\d+(?:\.\d+)?)(\D+)?$/
