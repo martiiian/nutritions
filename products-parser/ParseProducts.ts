@@ -7,7 +7,9 @@ import { parseProduct } from './parseProduct.ts'
 const IGNORED_FILE_NAMES = ['_readme']
 const FILE_EXTENSIONS = ['.md']
 
-async function readAndParseProduct(filePath: string): Promise<{ product: ProductType; fileName: string } | undefined> {
+async function readAndParseProduct(
+  filePath: string,
+): Promise<{ product: ProductType; fileName: string } | undefined> {
   const content = await Deno.readTextFile(filePath)
   try {
     const fileName = basename(filePath).split('.')[0]

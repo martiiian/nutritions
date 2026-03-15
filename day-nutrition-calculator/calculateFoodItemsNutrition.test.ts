@@ -7,7 +7,12 @@ const products: ProductsMapType = new Map([
     'гречка',
     {
       nutrition: {
-        values: { fats: 3.3, proteins: 12.6, carbohydrates: 62.1, calories: 313 },
+        values: {
+          fats: 3.3,
+          proteins: 12.6,
+          carbohydrates: 62.1,
+          calories: 313,
+        },
         portionSize: null,
         totalWeight: null,
       },
@@ -27,7 +32,12 @@ const products: ProductsMapType = new Map([
     'масло',
     {
       nutrition: {
-        values: { fats: 82.5, proteins: 0.5, carbohydrates: 0.8, calories: 748 },
+        values: {
+          fats: 82.5,
+          proteins: 0.5,
+          carbohydrates: 0.8,
+          calories: 748,
+        },
         portionSize: 10,
         totalWeight: null,
       },

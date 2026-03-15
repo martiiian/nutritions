@@ -8,7 +8,10 @@ import { SummaryProductNutrition } from './types.ts'
 import { parseProducts } from './products-parser/ParseProducts.ts'
 
 function formatNutrition(
-  { fats, proteins, carbohydrates, calories }: Omit<SummaryProductNutrition, 'name'>,
+  { fats, proteins, carbohydrates, calories }: Omit<
+    SummaryProductNutrition,
+    'name'
+  >,
 ) {
   const r = (n: number) => Math.round(n)
   return `${r(fats)}/${r(proteins)}/${r(carbohydrates)} ${r(calories)} ккал`

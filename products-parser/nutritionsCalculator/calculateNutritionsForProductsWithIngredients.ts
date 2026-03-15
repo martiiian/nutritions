@@ -2,7 +2,10 @@ import { calculateFoodItemsNutrition } from '@/day-nutrition-calculator/index.ts
 import { FoodUnit, NutritionBlockValues, ProductsMapType } from '@/types.ts'
 import { toFixedNumber } from '@/libs/toFixedNumber.ts'
 
-function calculateTotalWeight(items: FoodUnit[], products: ProductsMapType): number {
+function calculateTotalWeight(
+  items: FoodUnit[],
+  products: ProductsMapType,
+): number {
   return items.reduce((sum, { name, quantity, unit }) => {
     if (unit) return sum + quantity
 
@@ -37,7 +40,10 @@ function resolveProductNutrition(
   // Рекурсивно разрешаем nutrition для каждого ингредиента
   for (const ingredient of product.ingredients.items) {
     const ingredientProduct = products.get(ingredient.name)
-    if (ingredientProduct && !ingredientProduct.nutrition && ingredientProduct.ingredients?.items) {
+    if (
+      ingredientProduct && !ingredientProduct.nutrition &&
+      ingredientProduct.ingredients?.items
+    ) {
       resolveProductNutrition(ingredient.name, products, resolving)
     }
   }
@@ -53,7 +59,9 @@ function resolveProductNutrition(
   const normalizedValues = {
     fats: toFixedNumber(calculatedNutrition.fats / totalWeight * 100),
     proteins: toFixedNumber(calculatedNutrition.proteins / totalWeight * 100),
-    carbohydrates: toFixedNumber(calculatedNutrition.carbohydrates / totalWeight * 100),
+    carbohydrates: toFixedNumber(
+      calculatedNutrition.carbohydrates / totalWeight * 100,
+    ),
     calories: toFixedNumber(calculatedNutrition.calories / totalWeight * 100),
   }
 
