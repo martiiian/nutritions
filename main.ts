@@ -1,4 +1,4 @@
-import { blue, green } from '@std/fmt/colors'
+import { green, red, rgb24 } from '@std/fmt/colors'
 import {
   calculateFoodItemsNutrition,
   parseDayMeal,
@@ -7,28 +7,34 @@ import { SummaryProductNutrition } from './types.ts'
 
 import { parseProducts } from './products-parser/ParseProducts.ts'
 
+function formatNutrition(
+  { fats, proteins, carbohydrates, calories }: Omit<SummaryProductNutrition, 'name'>,
+) {
+  const r = (n: number) => Math.round(n)
+  return `${r(fats)}/${r(proteins)}/${r(carbohydrates)} ${r(calories)} ккал`
+}
+
 function renderMessage(
   dayResult: Omit<SummaryProductNutrition, 'name'>,
   uniqueProducts: Record<string, Omit<SummaryProductNutrition, 'name'>>,
 ) {
   console.log()
 
-  Object.entries(uniqueProducts).forEach(
-    ([name, { fats, calories, proteins, carbohydrates }]) => {
-      console.log(
-        `${fats}/${proteins}/${carbohydrates}/${calories}   `,
-        green(name),
-      )
-    },
-  )
+  Object.entries(uniqueProducts).forEach(([name, nutrition]) => {
+    console.log(green(name))
+    console.log(formatNutrition(nutrition))
+  })
 
-  console.log()
+  const cal = Math.round(dayResult.calories)
+  const [colorFn, emoji] = cal <= 2000
+    ? [green, '😊']
+    : cal <= 2500
+    ? [red, '😬']
+    : [(s: string) => rgb24(s, 0x8B0000), '😡']
 
-  console.log(
-    blue(
-      `Day result: ${dayResult.fats}/${dayResult.proteins}/${dayResult.carbohydrates}/${dayResult.calories}`,
-    ),
-  )
+  console.log('─'.repeat(40))
+  console.log(colorFn(`Итого ${emoji}`))
+  console.log(colorFn(formatNutrition(dayResult)))
 }
 
 async function main() {
@@ -51,11 +57,11 @@ async function main() {
     console.log('Обработка завершена успешно!')
     const dayMeal = await parseDayMeal(dayMealFileName)
     if (dayMeal) {
-      const { dayResult, uniqueProducts } = calculateFoodItemsNutrition(
+      const { result, uniqueProducts } = calculateFoodItemsNutrition(
         products,
         dayMeal,
       )
-      renderMessage(dayResult, uniqueProducts)
+      renderMessage(result, uniqueProducts)
     }
   } catch (e) {
     console.error('Произошла ошибка:', e)

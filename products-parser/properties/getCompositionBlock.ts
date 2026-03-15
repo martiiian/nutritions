@@ -26,8 +26,10 @@ export function getCompositionBlock(content: string[]): ProductIngredientsType {
   const items = content
     .filter((line) => line.startsWith('-'))
     .map((line) => {
-      const match = line.match(/- (.*?) - (.*)/)
-      return match ? { name: match[1], ...parseUnit(match[2]) } : null
+      const match = line.match(/- \[?\[?(.*?)\]?\]? - (.*)/)
+      if (match) return { name: match[1], ...parseUnit(match[2]) }
+      const nameOnly = line.match(/^- \[?\[?(.+?)\]?\]?$/)
+      return nameOnly ? { name: nameOnly[1], quantity: 1, unit: null } : null
     })
     .filter((item): item is ProductIngredientsType['items'][number] =>
       item !== null

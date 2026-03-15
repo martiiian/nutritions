@@ -35,13 +35,13 @@ export interface ProductRecipeType {
 }
 
 export interface ProductType {
-  nutrition: ProductNutritionType | null
-  price: ProductPriceType | null
-  ingredients: ProductIngredientsType | null
-  recipe: ProductRecipeType | null
+  nutrition?: ProductNutritionType
+  price?: ProductPriceType
+  ingredients?: ProductIngredientsType
+  recipe?: ProductRecipeType
 }
 
-export type ProductsType = Map<string, ProductType>
+export type ProductsMapType = Map<string, ProductType>
 
 export type SummaryProductNutrition = {
   name: string

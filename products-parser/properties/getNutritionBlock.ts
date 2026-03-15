@@ -12,9 +12,10 @@ function getNutritionValues(nutritionStr: string): NutritionBlockValues {
 }
 
 export function getNutritionBlock(content: string[]): ProductType['nutrition'] {
+  const portionSize = Number(content[1]) || null
   return {
     values: getNutritionValues(content[0]),
-    portionSize: Number(content[1]) || null,
-    totalWeight: Number(content[2]) || null,
+    portionSize,
+    totalWeight: Number(content[2]) || portionSize,
   }
 }
