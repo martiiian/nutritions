@@ -1,4 +1,5 @@
 import { green, red, rgb24 } from '@std/fmt/colors'
+import { Table } from '@cliffy/table'
 import {
   calculateFoodItemsNutrition,
   parseDayMeal,
@@ -7,26 +8,19 @@ import { SummaryProductNutrition } from './types.ts'
 
 import { parseProducts } from './products-parser/ParseProducts.ts'
 
-function formatNutrition(
-  { fats, proteins, carbohydrates, calories }: Omit<
-    SummaryProductNutrition,
-    'name'
-  >,
-) {
-  const r = (n: number) => Math.round(n)
-  return `${r(fats)}/${r(proteins)}/${r(carbohydrates)} ${r(calories)} ккал`
-}
-
 function renderMessage(
   dayResult: Omit<SummaryProductNutrition, 'name'>,
   uniqueProducts: Record<string, Omit<SummaryProductNutrition, 'name'>>,
 ) {
-  console.log()
+  const r = (n: number) => Math.round(n)
 
-  Object.entries(uniqueProducts).forEach(([name, nutrition]) => {
-    console.log(green(name))
-    console.log(formatNutrition(nutrition))
-  })
+  const rows = Object.entries(uniqueProducts).map(([name, nutrition]) => [
+    green(name),
+    r(nutrition.fats).toString(),
+    r(nutrition.proteins).toString(),
+    r(nutrition.carbohydrates).toString(),
+    r(nutrition.calories).toString(),
+  ])
 
   const cal = Math.round(dayResult.calories)
   const [colorFn, emoji] = cal <= 2000
@@ -35,9 +29,19 @@ function renderMessage(
     ? [red, '😬']
     : [(s: string) => rgb24(s, 0x8B0000), '😡']
 
-  console.log('─'.repeat(40))
-  console.log(colorFn(`Итого ${emoji}`))
-  console.log(colorFn(formatNutrition(dayResult)))
+  rows.push([
+    colorFn(`Итого ${emoji}`),
+    colorFn(r(dayResult.fats).toString()),
+    colorFn(r(dayResult.proteins).toString()),
+    colorFn(r(dayResult.carbohydrates).toString()),
+    colorFn(r(dayResult.calories).toString()),
+  ])
+
+  console.log()
+  new Table()
+    .header(['Продукт', 'Жиры', 'Белки', 'Углеводы', 'Калории'])
+    .body(rows)
+    .render()
 }
 
 async function main() {
